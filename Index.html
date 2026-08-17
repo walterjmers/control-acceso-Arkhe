@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de Acceso - Clío</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 10px; background: #1a1a1a; color: white; margin: 0; }
+    #reader { width: 100%; max-width: 400px; margin: 10px auto; }
+    #resultado { margin: 20px auto; padding: 20px; border-radius: 10px; font-size: 22px; font-weight: bold; min-height: 100px; max-width: 400px; }
+    .valido { background: #2e7d32; }
+    .usado { background: #f9a825; color: black; }
+    .no-encontrado { background: #c62828; }
+    .esperando { background: #333; }
+  </style>
+</head>
+<body>
+  <h2>🎭 Control de Acceso - Clío</h2>
+  <div id="reader"></div>
+  <div id="resultado" class="esperando">Apuntá la cámara al código QR</div>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
+    var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxSAJKDI4WihlWKbU88rCD4GevnwIWnrNT9zkG5bQLu85AAx0pBlYfXhSjc-AlZGvT/exec";
+    var bloqueado = false;
+
+    function onScanSuccess(decodedText) {
+      if (bloqueado) return;
+      bloqueado = true;
+
+      var div = document.getElementById('resultado');
+      div.className = 'esperando';
+      div.innerHTML = 'Verificando...';
+
+      fetch(APPS_SCRIPT_URL + "?codigo=" + encodeURIComponent(decodedText))
+        .then(function(res) { return res.json(); })
+        .then(function(data) { mostrarResultado(data); })
+        .catch(function(err) {
+          div.className = 'no-encontrado';
+          div.innerHTML = 'ERROR DE CONEXIÓN<br>' + err.message;
+          reiniciar();
+        });
+    }
+
+    function mostrarResultado(res) {
+      var div = document.getElementById('resultado');
+      if (res.estado === 'valido') {
+        div.className = 'valido';
+        div.innerHTML = '✅ VÁLIDO<br>' + res.nombre + ' — ' + res.cantidad + ' persona(s)';
+      } else if (res.estado === 'usado') {
+        div.className = 'usado';
+        div.innerHTML = '⚠️ YA FUE USADO<br>' + res.nombre;
+      } else {
+        div.className = 'no-encontrado';
+        div.innerHTML = '❌ CÓDIGO NO ENCONTRADO';
+      }
+      reiniciar();
+    }
+
+    function reiniciar() {
+      setTimeout(function() {
+        bloqueado = false;
+        var div = document.getElementById('resultado');
+        div.className = 'esperando';
+        div.innerHTML = 'Apuntá la cámara al código QR';
+      }, 6000);
+    }
+
+    var scanner = new Html5Qrcode("reader");
+    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+  </script>
+</body>
+</html>
