@@ -1,73 +1,364 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Control de Acceso - Clío</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Control de Acceso - Arkhé en escena</title>
+
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 10px; background: #1a1a1a; color: white; margin: 0; }
-    #reader { width: 100%; max-width: 400px; margin: 10px auto; }
-    #resultado { margin: 20px auto; padding: 20px; border-radius: 10px; font-size: 22px; font-weight: bold; min-height: 100px; max-width: 400px; }
-    .valido { background: #2e7d32; }
-    .usado { background: #f9a825; color: black; }
-    .no-encontrado { background: #c62828; }
-    .esperando { background: #333; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 10px;
+      background: #1a1a1a;
+      color: white;
+      margin: 0;
+    }
+
+    h2 {
+      margin-top: 20px;
+    }
+
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 15px auto;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    #resultado {
+      margin: 20px auto;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 22px;
+      font-weight: bold;
+      min-height: 100px;
+      max-width: 400px;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+
+      box-sizing: border-box;
+    }
+
+    .valido {
+      background: #2e7d32;
+      color: white;
+    }
+
+    .usado {
+      background: #f9a825;
+      color: black;
+    }
+
+    .no-encontrado {
+      background: #c62828;
+      color: white;
+    }
+
+    .esperando {
+      background: #333;
+      color: white;
+    }
   </style>
 </head>
-<body>
-  <h2>🎭 Control de Acceso - Arkhé en escena</h2>
-  <div id="reader"></div>
-  <div id="resultado" class="esperando">Apuntá la cámara al código QR</div>
 
+<body>
+
+  <h2>🎭 Control de Acceso</h2>
+  <h3>Arkhé en escena</h3>
+
+  <div id="reader"></div>
+
+  <div id="resultado" class="esperando">
+    Apuntá la cámara al código QR
+  </div>
+
+
+  <!-- Librería para leer códigos QR -->
   <script src="https://unpkg.com/html5-qrcode"></script>
+
+
   <script>
-    var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc9n1BtpQFUkGXCDJlviZaHvSoDrOa5g15r9ah8B23wUEN4-yR0D8ES7ieDlrgshXy/exec";
+
+    /* =========================================================
+       URL DE GOOGLE APPS SCRIPT
+       ========================================================= */
+
+    var APPS_SCRIPT_URL =
+      "https://script.google.com/macros/s/AKfycbxc9n1BtpQFUkGXCDJlviZaHvSoDrOa5g15r9ah8B23wUEN4-yR0D8ES7ieDlrgshXy/exec";
+
+
+    /* =========================================================
+       VARIABLES
+       ========================================================= */
+
     var bloqueado = false;
 
+    var scanner = new Html5Qrcode("reader");
+
+
+    /* =========================================================
+       CUANDO ENCUENTRA UN QR
+       ========================================================= */
+
     function onScanSuccess(decodedText) {
-      if (bloqueado) return;
+
+      // Evita leer el mismo QR muchas veces
+      if (bloqueado) {
+        return;
+      }
+
       bloqueado = true;
 
-      var div = document.getElementById('resultado');
-      div.className = 'esperando';
-      div.innerHTML = 'Verificando...';
+      var div = document.getElementById("resultado");
 
-      fetch(APPS_SCRIPT_URL + "?codigo=" + encodeURIComponent(decodedText))
-        .then(function(res) { return res.json(); })
-        .then(function(data) { mostrarResultado(data); })
-        .catch(function(err) {
-          div.className = 'no-encontrado';
-          div.innerHTML = 'ERROR DE CONEXIÓN<br>' + err.message;
-          reiniciar();
-        });
+      div.className = "esperando";
+      div.innerHTML = "🔎 Verificando entrada...";
+
+
+      /* =========================================================
+         CONSULTA A GOOGLE APPS SCRIPT
+         ========================================================= */
+
+      fetch(
+        APPS_SCRIPT_URL +
+        "?codigo=" +
+        encodeURIComponent(decodedText)
+      )
+
+      .then(function(response) {
+
+        if (!response.ok) {
+          throw new Error(
+            "Error del servidor: " + response.status
+          );
+        }
+
+        return response.json();
+
+      })
+
+      .then(function(data) {
+
+        mostrarResultado(data);
+
+      })
+
+      .catch(function(error) {
+
+        console.error(error);
+
+        div.className = "no-encontrado";
+
+        div.innerHTML =
+          "❌ ERROR DE CONEXIÓN<br><br>" +
+          error.message;
+
+        vibrarError();
+
+        reiniciar();
+
+      });
+
     }
+
+
+    /* =========================================================
+       MOSTRAR RESULTADO
+       ========================================================= */
 
     function mostrarResultado(res) {
-      var div = document.getElementById('resultado');
-      if (res.estado === 'valido') {
-        div.className = 'valido';
-        div.innerHTML = '✅ VÁLIDO<br>' + res.nombre + ' — ' + res.cantidad + ' persona(s)';
-      } else if (res.estado === 'usado') {
-        div.className = 'usado';
-        div.innerHTML = '⚠️ YA FUE USADO<br>' + res.nombre;
-      } else {
-        div.className = 'no-encontrado';
-        div.innerHTML = '❌ CÓDIGO NO ENCONTRADO';
+
+      var div = document.getElementById("resultado");
+
+
+      /* -------------------------
+         ENTRADA VÁLIDA
+         ------------------------- */
+
+      if (res.estado === "valido") {
+
+        div.className = "valido";
+
+        div.innerHTML =
+          "✅ ENTRADA VÁLIDA" +
+          "<br><br>" +
+          res.nombre +
+          "<br>" +
+          res.cantidad +
+          " persona(s)";
+
+        vibrarOk();
+
       }
+
+
+      /* -------------------------
+         ENTRADA YA UTILIZADA
+         ------------------------- */
+
+      else if (res.estado === "usado") {
+
+        div.className = "usado";
+
+        div.innerHTML =
+          "⚠️ ENTRADA YA UTILIZADA" +
+          "<br><br>" +
+          res.nombre;
+
+        vibrarError();
+
+      }
+
+
+      /* -------------------------
+         CÓDIGO DESCONOCIDO
+         ------------------------- */
+
+      else {
+
+        div.className = "no-encontrado";
+
+        div.innerHTML =
+          "❌ CÓDIGO NO ENCONTRADO";
+
+        vibrarError();
+
+      }
+
+
       reiniciar();
+
     }
+
+
+    /* =========================================================
+       VIBRACIÓN DEL CELULAR
+       ========================================================= */
+
+    function vibrarOk() {
+
+      if ("vibrate" in navigator) {
+        navigator.vibrate(200);
+      }
+
+    }
+
+
+    function vibrarError() {
+
+      if ("vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+      }
+
+    }
+
+
+    /* =========================================================
+       REINICIAR ESCÁNER
+       ========================================================= */
 
     function reiniciar() {
+
       setTimeout(function() {
+
         bloqueado = false;
-        var div = document.getElementById('resultado');
-        div.className = 'esperando';
-        div.innerHTML = 'Apuntá la cámara al código QR';
-      }, 6000);
+
+        var div =
+          document.getElementById("resultado");
+
+        div.className = "esperando";
+
+        div.innerHTML =
+          "📷 Apuntá la cámara al código QR";
+
+      }, 5000);
+
     }
 
-    var scanner = new Html5Qrcode("reader");
-    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+
+    /* =========================================================
+       INICIAR CÁMARA
+       ========================================================= */
+
+    function iniciarCamara() {
+
+      scanner.start(
+
+        {
+          facingMode: "environment"
+        },
+
+        {
+          fps: 10,
+
+          qrbox: {
+            width: 250,
+            height: 250
+          },
+
+          aspectRatio: 1.0
+        },
+
+        onScanSuccess
+
+      )
+
+      .then(function() {
+
+        console.log(
+          "Cámara iniciada correctamente"
+        );
+
+      })
+
+      .catch(function(error) {
+
+        console.error(
+          "Error al iniciar cámara:",
+          error
+        );
+
+        var div =
+          document.getElementById("resultado");
+
+        div.className =
+          "no-encontrado";
+
+        div.innerHTML =
+          "❌ NO SE PUDO ABRIR LA CÁMARA" +
+          "<br><br>" +
+          "Verificá que hayas permitido el acceso a la cámara." +
+          "<br><br>" +
+          "<small>" +
+          error +
+          "</small>";
+
+      });
+
+    }
+
+
+    /* =========================================================
+       ARRANCAR
+       ========================================================= */
+
+    window.addEventListener(
+      "load",
+      function() {
+
+        iniciarCamara();
+
+      }
+    );
+
   </script>
+
 </body>
 </html>
