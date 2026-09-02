@@ -1,196 +1,364 @@
-// ============================================================
-// CONTROL DE ACCESO - LA PIEDRA BRUTA
-// ============================================================
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-function doGet(e) {
+  <title>Control de Acceso - Arkhé en escena</title>
 
-  try {
-
-    // --------------------------------------------------------
-    // 1. COMPROBAR QUE LLEGÓ UN CÓDIGO
-    // --------------------------------------------------------
-
-    if (!e || !e.parameter || !e.parameter.codigo) {
-
-      return responderJSON({
-        estado: "error",
-        mensaje: "No se recibió ningún código."
-      });
-
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 10px;
+      background: #1a1a1a;
+      color: white;
+      margin: 0;
     }
 
-
-    // Código recibido desde el lector QR
-    var codigoRecibido = String(e.parameter.codigo).trim();
-
-
-    // --------------------------------------------------------
-    // 2. ABRIR LA PLANILLA
-    // --------------------------------------------------------
-
-    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Nombre exacto de tu hoja según la captura
-    var sheet = spreadsheet.getSheetByName("Form_Responses");
-
-
-    if (!sheet) {
-
-      return responderJSON({
-        estado: "error",
-        mensaje: "No se encontró la hoja Form_Responses."
-      });
-
+    h2 {
+      margin-top: 20px;
     }
 
-
-    // --------------------------------------------------------
-    // 3. COLUMNAS DE TU PLANILLA
-    // --------------------------------------------------------
-
-    var COL_NOMBRE = 2;      // B
-    var COL_DIA = 5;         // E
-    var COL_CANTIDAD = 6;    // F
-    var COL_PAGO = 7;        // G
-    var COL_CODIGO = 9;      // I
-    var COL_USADO = 10;      // J
-
-
-    // --------------------------------------------------------
-    // 4. LEER LOS DATOS
-    // --------------------------------------------------------
-
-    var ultimaFila = sheet.getLastRow();
-
-    if (ultimaFila < 2) {
-
-      return responderJSON({
-        estado: "no_encontrado"
-      });
-
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 15px auto;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
     }
 
+    #resultado {
+      margin: 20px auto;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 22px;
+      font-weight: bold;
+      min-height: 100px;
+      max-width: 400px;
 
-    var datos = sheet
-      .getRange(2, 1, ultimaFila - 1, 10)
-      .getValues();
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+
+      box-sizing: border-box;
+    }
+
+    .valido {
+      background: #2e7d32;
+      color: white;
+    }
+
+    .usado {
+      background: #f9a825;
+      color: black;
+    }
+
+    .no-encontrado {
+      background: #c62828;
+      color: white;
+    }
+
+    .esperando {
+      background: #333;
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>🎭 Control de Acceso</h2>
+  <h3>Arkhé en escena</h3>
+
+  <div id="reader"></div>
+
+  <div id="resultado" class="esperando">
+    Apuntá la cámara al código QR
+  </div>
 
 
-    // --------------------------------------------------------
-    // 5. BUSCAR EL CÓDIGO
-    // --------------------------------------------------------
-
-    for (var i = 0; i < datos.length; i++) {
-
-      var codigoGuardado = String(datos[i][COL_CODIGO - 1]).trim();
+  <!-- Librería para leer códigos QR -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
 
-      if (codigoGuardado === codigoRecibido) {
+  <script>
 
-        var filaReal = i + 2;
+    /* =========================================================
+       URL DE GOOGLE APPS SCRIPT
+       ========================================================= */
 
-        var nombre = datos[i][COL_NOMBRE - 1];
-        var dia = datos[i][COL_DIA - 1];
-        var cantidad = datos[i][COL_CANTIDAD - 1];
-        var pago = datos[i][COL_PAGO - 1];
-        var usado = datos[i][COL_USADO - 1];
+    var APPS_SCRIPT_URL =
+      "https://script.google.com/macros/s/AKfycbxc9n1BtpQFUkGXCDJlviZaHvSoDrOa5g15r9ah8B23wUEN4-yR0D8ES7ieDlrgshXy/exec";
 
 
-        // ----------------------------------------------------
-        // 6. COMPROBAR QUE ESTÉ PAGADO
-        // ----------------------------------------------------
+    /* =========================================================
+       VARIABLES
+       ========================================================= */
 
-        if (
-          String(pago).trim().toLowerCase() !== "sí" &&
-          String(pago).trim().toLowerCase() !== "si"
-        ) {
+    var bloqueado = false;
 
-          return responderJSON({
-            estado: "no_pagado",
-            nombre: nombre,
-            cantidad: cantidad,
-            dia: dia
-          });
+    var scanner = new Html5Qrcode("reader");
 
+
+    /* =========================================================
+       CUANDO ENCUENTRA UN QR
+       ========================================================= */
+
+    function onScanSuccess(decodedText) {
+
+      // Evita leer el mismo QR muchas veces
+      if (bloqueado) {
+        return;
+      }
+
+      bloqueado = true;
+
+      var div = document.getElementById("resultado");
+
+      div.className = "esperando";
+      div.innerHTML = "🔎 Verificando entrada...";
+
+
+      /* =========================================================
+         CONSULTA A GOOGLE APPS SCRIPT
+         ========================================================= */
+
+      fetch(
+        APPS_SCRIPT_URL +
+        "?codigo=" +
+        encodeURIComponent(decodedText)
+      )
+
+      .then(function(response) {
+
+        if (!response.ok) {
+          throw new Error(
+            "Error del servidor: " + response.status
+          );
         }
 
+        return response.json();
 
-        // ----------------------------------------------------
-        // 7. COMPROBAR SI YA FUE UTILIZADO
-        // ----------------------------------------------------
+      })
 
-        if (
-          String(usado).trim().toLowerCase() === "sí" ||
-          String(usado).trim().toLowerCase() === "si" ||
-          String(usado).trim().toLowerCase() === "usado"
-        ) {
+      .then(function(data) {
 
-          return responderJSON({
-            estado: "usado",
-            nombre: nombre,
-            cantidad: cantidad,
-            dia: dia
-          });
+        mostrarResultado(data);
 
-        }
+      })
 
+      .catch(function(error) {
 
-        // ----------------------------------------------------
-        // 8. MARCAR LA ENTRADA COMO UTILIZADA
-        // ----------------------------------------------------
+        console.error(error);
 
-        sheet
-          .getRange(filaReal, COL_USADO)
-          .setValue("Sí");
+        div.className = "no-encontrado";
+
+        div.innerHTML =
+          "❌ ERROR DE CONEXIÓN<br><br>" +
+          error.message;
+
+        vibrarError();
+
+        reiniciar();
+
+      });
+
+    }
 
 
-        // ----------------------------------------------------
-        // 9. DEVOLVER ENTRADA VÁLIDA
-        // ----------------------------------------------------
+    /* =========================================================
+       MOSTRAR RESULTADO
+       ========================================================= */
 
-        return responderJSON({
-          estado: "valido",
-          nombre: nombre,
-          cantidad: cantidad,
-          dia: dia,
-          codigo: codigoRecibido
-        });
+    function mostrarResultado(res) {
 
+      var div = document.getElementById("resultado");
+
+
+      /* -------------------------
+         ENTRADA VÁLIDA
+         ------------------------- */
+
+      if (res.estado === "valido") {
+
+        div.className = "valido";
+
+        div.innerHTML =
+          "✅ ENTRADA VÁLIDA" +
+          "<br><br>" +
+          res.nombre +
+          "<br>" +
+          res.cantidad +
+          " persona(s)";
+
+        vibrarOk();
+
+      }
+
+
+      /* -------------------------
+         ENTRADA YA UTILIZADA
+         ------------------------- */
+
+      else if (res.estado === "usado") {
+
+        div.className = "usado";
+
+        div.innerHTML =
+          "⚠️ ENTRADA YA UTILIZADA" +
+          "<br><br>" +
+          res.nombre;
+
+        vibrarError();
+
+      }
+
+
+      /* -------------------------
+         CÓDIGO DESCONOCIDO
+         ------------------------- */
+
+      else {
+
+        div.className = "no-encontrado";
+
+        div.innerHTML =
+          "❌ CÓDIGO NO ENCONTRADO";
+
+        vibrarError();
+
+      }
+
+
+      reiniciar();
+
+    }
+
+
+    /* =========================================================
+       VIBRACIÓN DEL CELULAR
+       ========================================================= */
+
+    function vibrarOk() {
+
+      if ("vibrate" in navigator) {
+        navigator.vibrate(200);
       }
 
     }
 
 
-    // --------------------------------------------------------
-    // 10. SI EL CÓDIGO NO EXISTE
-    // --------------------------------------------------------
+    function vibrarError() {
 
-    return responderJSON({
-      estado: "no_encontrado"
-    });
+      if ("vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+      }
 
-
-  } catch (error) {
-
-    return responderJSON({
-      estado: "error",
-      mensaje: error.toString()
-    });
-
-  }
-
-}
+    }
 
 
+    /* =========================================================
+       REINICIAR ESCÁNER
+       ========================================================= */
 
-// ============================================================
-// FUNCIÓN PARA RESPONDER AL LECTOR QR
-// ============================================================
+    function reiniciar() {
 
-function responderJSON(objeto) {
+      setTimeout(function() {
 
-  return ContentService
-    .createTextOutput(JSON.stringify(objeto))
-    .setMimeType(ContentService.MimeType.JSON);
+        bloqueado = false;
 
-}
+        var div =
+          document.getElementById("resultado");
+
+        div.className = "esperando";
+
+        div.innerHTML =
+          "📷 Apuntá la cámara al código QR";
+
+      }, 5000);
+
+    }
+
+
+    /* =========================================================
+       INICIAR CÁMARA
+       ========================================================= */
+
+    function iniciarCamara() {
+
+      scanner.start(
+
+        {
+          facingMode: "environment"
+        },
+
+        {
+          fps: 10,
+
+          qrbox: {
+            width: 250,
+            height: 250
+          },
+
+          aspectRatio: 1.0
+        },
+
+        onScanSuccess
+
+      )
+
+      .then(function() {
+
+        console.log(
+          "Cámara iniciada correctamente"
+        );
+
+      })
+
+      .catch(function(error) {
+
+        console.error(
+          "Error al iniciar cámara:",
+          error
+        );
+
+        var div =
+          document.getElementById("resultado");
+
+        div.className =
+          "no-encontrado";
+
+        div.innerHTML =
+          "❌ NO SE PUDO ABRIR LA CÁMARA" +
+          "<br><br>" +
+          "Verificá que hayas permitido el acceso a la cámara." +
+          "<br><br>" +
+          "<small>" +
+          error +
+          "</small>";
+
+      });
+
+    }
+
+
+    /* =========================================================
+       ARRANCAR
+       ========================================================= */
+
+    window.addEventListener(
+      "load",
+      function() {
+
+        iniciarCamara();
+
+      }
+    );
+
+  </script>
+
+</body>
+</html>
