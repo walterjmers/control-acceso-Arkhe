@@ -8,11 +8,6 @@
 
   <style>
 
-    <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js');
-  }
-</script>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
@@ -541,6 +536,35 @@
       }
     );
 
+  </script>
+<!-- ESTO VA EN EL <head>, TAL COMO YA LO TENÉS (sin el script adentro) -->
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>Control de Acceso - Arkhé en escena</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 10px;
+      background: #1a1a1a;
+      color: white;
+      margin: 0;
+    }
+    /* ... el resto de tu CSS sigue igual, sin tocar nada ... */
+  </style>
+</head>
+
+
+<!-- ESTO VA JUSTO ANTES DE </body>, AL FINAL DEL TODO DEL ARCHIVO -->
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
   </script>
 
 </body>
