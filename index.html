@@ -150,6 +150,122 @@
 
     function consultarEntrada(codigo) {
 
+  var callbackName =
+    "respuestaQR_" +
+    Date.now() +
+    "_" +
+    Math.floor(Math.random() * 100000);
+
+  var script = document.createElement("script");
+
+  var respondio = false;
+
+  var timeout;
+
+
+  // ============================================================
+  // CUANDO GOOGLE RESPONDE CORRECTAMENTE
+  // ============================================================
+
+  window[callbackName] = function(data) {
+
+    if (respondio) return;
+
+    respondio = true;
+
+    clearTimeout(timeout);
+
+    mostrarResultado(data);
+
+    setTimeout(function() {
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+
+      try {
+        delete window[callbackName];
+      } catch (e) {}
+
+    }, 1000);
+  };
+
+
+  // ============================================================
+  // URL
+  // ============================================================
+
+  script.src =
+    APPS_SCRIPT_URL +
+    "?codigo=" +
+    encodeURIComponent(codigo) +
+    "&callback=" +
+    encodeURIComponent(callbackName) +
+    "&nocache=" +
+    Date.now();
+
+
+  // ============================================================
+  // SI EL NAVEGADOR REPORTA ERROR
+  // NO MOSTRAR ERROR INMEDIATAMENTE
+  // ============================================================
+
+  script.onerror = function() {
+
+    console.log(
+      "La respuesta del servidor tuvo un problema de carga."
+    );
+
+    // Esperamos porque Apps Script puede haber procesado
+    // correctamente la entrada aunque Chrome reporte error.
+
+  };
+
+
+  // ============================================================
+  // SOLO MOSTRAR ERROR SI PASAN 15 SEGUNDOS SIN RESPUESTA
+  // ============================================================
+
+  timeout = setTimeout(function() {
+
+    if (respondio) {
+      return;
+    }
+
+    respondio = true;
+
+    var div =
+      document.getElementById("resultado");
+
+    div.className =
+      "no-encontrado";
+
+    div.innerHTML =
+      "❌ NO SE RECIBIÓ RESPUESTA" +
+      "<br><br>" +
+      "<span class='detalle'>" +
+      "Verificá la conexión e intentá nuevamente." +
+      "</span>";
+
+    vibrarError();
+
+    bloqueado = false;
+
+
+    if (script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+
+    try {
+      delete window[callbackName];
+    } catch (e) {}
+
+  }, 15000);
+
+
+  document.body.appendChild(script);
+}
+
       var callbackName =
         "respuestaQR_" +
         Date.now() +
@@ -538,14 +654,6 @@
 
   </script>
 <!-- ESTO VA EN EL <head>, TAL COMO YA LO TENÉS (sin el script adentro) -->
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1a1a1a">
-  <title>Control de Acceso - Arkhé en escena</title>
-
-  <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
@@ -561,11 +669,6 @@
 
 <!-- ESTO VA JUSTO ANTES DE </body>, AL FINAL DEL TODO DEL ARCHIVO -->
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
-    }
-  </script>
 
 </body>
 </html>
