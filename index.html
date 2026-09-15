@@ -88,7 +88,23 @@
 </head>
 
 <body>
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      registrations.forEach(function(registration) {
+        registration.unregister();
+      });
+    });
+  }
 
+  if ("caches" in window) {
+    caches.keys().then(function(names) {
+      names.forEach(function(name) {
+        caches.delete(name);
+      });
+    });
+  }
+</script>
   <h2>🎭 Control de Acceso</h2>
   <h3>Arkhé en escena</h3>
 
