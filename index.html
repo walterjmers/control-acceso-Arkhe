@@ -162,158 +162,58 @@
 
     // ============================================================
     // CONSULTAR GOOGLE APPS SCRIPT MEDIANTE JSONP
+    // (única versión — tolera errores de carga transitorios
+    // y espera hasta 15s antes de declarar error real, porque
+    // Apps Script puede haber procesado todo del lado del
+    // servidor aunque el navegador tarde o falle en recibir
+    // la respuesta)
     // ============================================================
 
     function consultarEntrada(codigo) {
-
-  var callbackName =
-    "respuestaQR_" +
-    Date.now() +
-    "_" +
-    Math.floor(Math.random() * 100000);
-
-  var script = document.createElement("script");
-
-  var respondio = false;
-
-  var timeout;
-
-
-  // ============================================================
-  // CUANDO GOOGLE RESPONDE CORRECTAMENTE
-  // ============================================================
-
-  window[callbackName] = function(data) {
-
-    if (respondio) return;
-
-    respondio = true;
-
-    clearTimeout(timeout);
-
-    mostrarResultado(data);
-
-    setTimeout(function() {
-
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-
-      try {
-        delete window[callbackName];
-      } catch (e) {}
-
-    }, 1000);
-  };
-
-
-  // ============================================================
-  // URL
-  // ============================================================
-
-  script.src =
-    APPS_SCRIPT_URL +
-    "?codigo=" +
-    encodeURIComponent(codigo) +
-    "&callback=" +
-    encodeURIComponent(callbackName) +
-    "&nocache=" +
-    Date.now();
-
-
-  // ============================================================
-  // SI EL NAVEGADOR REPORTA ERROR
-  // NO MOSTRAR ERROR INMEDIATAMENTE
-  // ============================================================
-
-  script.onerror = function() {
-
-    console.log(
-      "La respuesta del servidor tuvo un problema de carga."
-    );
-
-    // Esperamos porque Apps Script puede haber procesado
-    // correctamente la entrada aunque Chrome reporte error.
-
-  };
-
-
-  // ============================================================
-  // SOLO MOSTRAR ERROR SI PASAN 15 SEGUNDOS SIN RESPUESTA
-  // ============================================================
-
-  timeout = setTimeout(function() {
-
-    if (respondio) {
-      return;
-    }
-
-    respondio = true;
-
-    var div =
-      document.getElementById("resultado");
-
-    div.className =
-      "no-encontrado";
-
-    div.innerHTML =
-      "❌ NO SE RECIBIÓ RESPUESTA" +
-      "<br><br>" +
-      "<span class='detalle'>" +
-      "Verificá la conexión e intentá nuevamente." +
-      "</span>";
-
-    vibrarError();
-
-    bloqueado = false;
-
-
-    if (script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-
-    try {
-      delete window[callbackName];
-    } catch (e) {}
-
-  }, 15000);
-
-
-  document.body.appendChild(script);
-}
 
       var callbackName =
         "respuestaQR_" +
         Date.now() +
         "_" +
-        Math.floor(Math.random() * 10000);
+        Math.floor(Math.random() * 100000);
 
-      var script =
-        document.createElement("script");
+      var script = document.createElement("script");
+
+      var respondio = false;
 
       var timeout;
 
 
       // ----------------------------------------------------------
-      // RESPUESTA DE GOOGLE
+      // CUANDO GOOGLE RESPONDE CORRECTAMENTE
       // ----------------------------------------------------------
 
       window[callbackName] = function(data) {
 
+        if (respondio) return;
+
+        respondio = true;
+
         clearTimeout(timeout);
 
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-
-        delete window[callbackName];
-
         mostrarResultado(data);
+
+        setTimeout(function() {
+
+          if (script.parentNode) {
+            script.parentNode.removeChild(script);
+          }
+
+          try {
+            delete window[callbackName];
+          } catch (e) {}
+
+        }, 1000);
       };
 
 
       // ----------------------------------------------------------
-      // CONSTRUIR URL
+      // URL
       // ----------------------------------------------------------
 
       script.src =
@@ -322,54 +222,37 @@
         encodeURIComponent(codigo) +
         "&callback=" +
         encodeURIComponent(callbackName) +
-        "&t=" +
+        "&nocache=" +
         Date.now();
 
 
       // ----------------------------------------------------------
-      // ERROR DE CONEXIÓN
+      // SI EL NAVEGADOR REPORTA ERROR AL CARGAR EL SCRIPT
+      // NO MOSTRAR ERROR INMEDIATAMENTE: puede que Apps Script
+      // ya haya procesado la entrada del lado del servidor.
+      // Dejamos que el timeout de abajo decida.
       // ----------------------------------------------------------
 
       script.onerror = function() {
 
-        clearTimeout(timeout);
+        console.log(
+          "La respuesta del servidor tuvo un problema de carga. Esperando por si igual llega."
+        );
 
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-
-        delete window[callbackName];
-
-        var div =
-          document.getElementById("resultado");
-
-        div.className =
-          "no-encontrado";
-
-        div.innerHTML =
-          "❌ ERROR DE CONEXIÓN" +
-          "<br><br>" +
-          "<span class='detalle'>" +
-          "No se pudo conectar con el sistema de entradas." +
-          "</span>";
-
-        vibrarError();
-
-        reiniciar();
       };
 
 
       // ----------------------------------------------------------
-      // TIEMPO MÁXIMO DE ESPERA
+      // SOLO MOSTRAR ERROR SI PASAN 15 SEGUNDOS SIN RESPUESTA
       // ----------------------------------------------------------
 
       timeout = setTimeout(function() {
 
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
+        if (respondio) {
+          return;
         }
 
-        delete window[callbackName];
+        respondio = true;
 
         var div =
           document.getElementById("resultado");
@@ -378,17 +261,26 @@
           "no-encontrado";
 
         div.innerHTML =
-          "⏱️ SIN RESPUESTA" +
+          "❌ NO SE RECIBIÓ RESPUESTA" +
           "<br><br>" +
           "<span class='detalle'>" +
-          "El servidor tardó demasiado en responder." +
+          "Verificá la conexión e intentá nuevamente." +
           "</span>";
 
         vibrarError();
 
-        reiniciar();
+        bloqueado = false;
 
-      }, 10000);
+
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+
+        try {
+          delete window[callbackName];
+        } catch (e) {}
+
+      }, 15000);
 
 
       // ----------------------------------------------------------
@@ -669,22 +561,6 @@
     );
 
   </script>
-<!-- ESTO VA EN EL <head>, TAL COMO YA LO TENÉS (sin el script adentro) -->
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 10px;
-      background: #1a1a1a;
-      color: white;
-      margin: 0;
-    }
-    /* ... el resto de tu CSS sigue igual, sin tocar nada ... */
-  </style>
-</head>
-
-
-<!-- ESTO VA JUSTO ANTES DE </body>, AL FINAL DEL TODO DEL ARCHIVO -->
-
 
 </body>
 </html>
