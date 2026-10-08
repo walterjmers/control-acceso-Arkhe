@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba Tpago - Arkhé</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .contenedor {
+      max-width: 500px;
+      margin: 0 auto;
+      background: #1f1f1f;
+      padding: 25px;
+      border-radius: 12px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0 16px;
+      border-radius: 8px;
+      border: none;
+      box-sizing: border-box;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      background: #2e7d32;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #resultado {
+      margin-top: 20px;
+      padding: 15px;
+      background: #2b2b2b;
+      border-radius: 8px;
+      text-align: left;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .error {
+      background: #c62828 !important;
+    }
+
+    .ok {
+      background: #2e7d32 !important;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="contenedor">
+
+    <h2>Prueba de pago Tpago</h2>
+
+    <label>Monto</label>
+    <input
+      type="number"
+      id="monto"
+      value="10000"
+      min="1"
+    >
+
+    <label>Descripción</label>
+    <input
+      type="text"
+      id="descripcion"
+      value="Entrada de prueba Arkhé en Escena"
+    >
+
+    <label>Referencia</label>
+    <input
+      type="text"
+      id="referencia"
+      value="PRUEBA-001"
+    >
+
+    <button id="btnPago" onclick="generarPago()">
+      Generar link de pago
+    </button>
+
+    <div id="resultado">
+      Esperando prueba...
+    </div>
+
+  </div>
+
+
+  <script>
+
+    const WORKER_URL =
+      "https://arkhe-tpago.waltermersproduccion.workers.dev/create-payment-link";
+
+
+    async function generarPago() {
+
+      const boton =
+        document.getElementById("btnPago");
+
+      const resultado =
+        document.getElementById("resultado");
+
+      const monto =
+        Number(
+          document.getElementById("monto").value
+        );
+
+      const descripcion =
+        document.getElementById("descripcion").value.trim();
+
+      const referencia =
+        document.getElementById("referencia").value.trim();
+
+
+      if (!monto || monto <= 0) {
+
+        resultado.className = "error";
+
+        resultado.innerHTML =
+          "Monto inválido.";
+
+        return;
+      }
+
+
+      boton.disabled = true;
+
+      resultado.className = "";
+
+      resultado.innerHTML =
+        "Conectando con Tpago...";
+
+
+      try {
+
+        const response =
+          await fetch(
+            WORKER_URL,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+                amount: monto,
+                description: descripcion,
+                reference_id: referencia,
+                require_user_data: true
+              })
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        console.log(
+          "Respuesta completa:",
+          data
+        );
+
+
+        if (!response.ok) {
+
+          resultado.className =
+            "error";
+
+          resultado.innerHTML =
+            "Error:\n\n" +
+            JSON.stringify(
+              data,
+              null,
+              2
+            );
+
+          return;
+        }
+
+
+        resultado.className =
+          "ok";
+
+
+        // Intentamos encontrar la URL del link
+        let link = null;
+
+        if (
+          data.tpago &&
+          data.tpago.payment_link &&
+          data.tpago.payment_link.link_url
+        ) {
+
+          link =
+            data.tpago.payment_link.link_url;
+
+        } else if (
+          data.payment_link &&
+          data.payment_link.link_url
+        ) {
+
+          link =
+            data.payment_link.link_url;
+        }
+
+
+        if (link) {
+
+          resultado.innerHTML =
+            "Link generado correctamente:\n\n" +
+            link +
+            "\n\nAbriendo Tpago...";
+
+
+          setTimeout(function() {
+
+            window.open(
+              link,
+              "_blank"
+            );
+
+          }, 1000);
+
+        } else {
+
+          resultado.innerHTML =
+            "La API respondió, pero no encontré el link automáticamente.\n\n" +
+            JSON.stringify(
+              data,
+              null,
+              2
+            );
+        }
+
+
+      } catch (error) {
+
+        resultado.className =
+          "error";
+
+        resultado.innerHTML =
+          "Error de conexión:\n\n" +
+          error.message;
+
+      } finally {
+
+        boton.disabled = false;
+
+      }
+    }
+
+  </script>
+
+</body>
+</html>
